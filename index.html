@@ -1,9 +1,11 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Polygon Arbitrage Bot</title>
   <script src="https://cdn.jsdelivr.net/npm/ethers/dist/ethers.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider/dist/umd/index.min.js"></script>
   <style>
     body { background-color: #013220; color: white; font-family: Arial; padding: 20px; }
     input, select, button { margin: 5px; padding: 8px; font-size: 16px; }
@@ -20,7 +22,9 @@
 
   <!-- Wallet Connect Section -->
   <div class="card">
-    <button onclick="connectWallet()">Connect MetaMask</button>
+    <button onclick="connectMetaMask()">Connect MetaMask</button>
+    <button onclick="connectWalletConnect()">Connect WalletConnect</button>
+    <button onclick="connectDeepLink()">Connect via Deep Link</button>
     <p><strong>Wallet:</strong> <span id="walletAddress">Not connected</span></p>
     <p><strong>USDC Balance:</strong> <span id="usdcBalance">0</span></p>
     <p><strong>Token Balance:</strong> <span id="tokenBalance">N/A</span></p>
@@ -96,7 +100,7 @@ const routerABI = [
 ];
 
 // Connect to MetaMask
-async function connectWallet() {
+async function connectMetaMask() {
   if (typeof window.ethereum !== 'undefined') {
     provider = new ethers.providers.Web3Provider(window.ethereum);
     try {
@@ -125,6 +129,43 @@ async function connectWallet() {
   } else {
     alert("MetaMask is not installed. Please install it to use this feature.");
   }
+}
+
+// Connect to WalletConnect
+async function connectWalletConnect() {
+  const walletConnectProvider = new WalletConnectProvider.default({
+    rpc: { 137: "https://polygon-rpc.com" },
+    chainId: 137
+  });
+
+  // Enable session (triggers QR Code modal)
+  await walletConnectProvider.enable();
+  provider = new ethers.providers.Web3Provider(walletConnectProvider);
+  signer = provider.getSigner();
+  userAddress = await signer.getAddress();
+  document.getElementById("walletAddress").textContent = userAddress;
+  await updateUSDCBalance();
+  await updateTokenBalance();
+
+  // Listen for account changes
+  walletConnectProvider.on("accountsChanged", (accounts) => {
+    userAddress = accounts[0];
+    document.getElementById("walletAddress").textContent = userAddress;
+    updateUSDCBalance();
+    updateTokenBalance();
+  });
+
+  walletConnectProvider.on("disconnect", () => {
+    userAddress = null;
+    document.getElementById("walletAddress").textContent = "Not connected";
+    document.getElementById("usdcBalance").textContent = "0";
+  });
+}
+
+// Connect via Deep Link
+function connectDeepLink() {
+  const deepLink = "https://metamask.app.link/dapp/YOUR_DAPP_URL"; // Replace with your DApp URL
+  window.open(deepLink, "_blank");
 }
 
 // Fetch USDC balance
@@ -247,7 +288,7 @@ async function performArbitrage() {
 // Auto-connect wallet if already connected
 window.onload = async () => {
   if (window.ethereum && window.ethereum.selectedAddress) {
-    await connectWallet();
+    await connectMetaMask();
   }
 };
 </script>
